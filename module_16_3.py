@@ -1,43 +1,58 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from typing import Dict
 
 app = FastAPI()
 
-# Словарь для имитации базы данных
+# Словарь для хранения пользователей
 users: Dict[str, str] = {'1': 'Имя: Example, возраст: 18'}
 
-# GET запрос по маршруту '/users'
-@app.get("/users")
+
+class User(BaseModel):
+    username: str
+    age: int
+
+
+@app.get('/users')
 async def get_users():
-    """Возвращает словарь users."""
     return users
 
-# POST запрос по маршруту '/user/{username}/{age}'
-@app.post("/user/{username}/{age}")
+
+@app.post('/user/{username}/{age}')
 async def create_user(username: str, age: int):
-    """Добавляет в словарь users по максимальному по значению ключом значение строки"""
-    max_id = max(int(key) for key in users.keys())
-    user_id = max_id + 1
-    users[str(user_id)] = f"Имя: {username}, возраст: {age}"
-    return f"User {user_id} is registered"
+    if age < 0:
+        raise HTTPException(status_code=400, detail="Возраст не может быть отрицательным")
 
-# PUT запрос по маршруту '/user/{user_id}/{username}/{age}'
-@app.put("/user/{user_id}/{username}/{age}")
+    # Находим максимальный ключ и добавляем нового пользователя
+    new_id = str(max(map(int, users.keys()), default=0) + 1)
+    users[new_id] = f"Имя: {username}, возраст: {age}"
+    return f"User {new_id} is registered"
+
+
+@app.put('/user/{user_id}/{username}/{age}')
 async def update_user(user_id: str, username: str, age: int):
-    """Обновляет значение из словаря users под ключом user_id."""
-    if user_id in users:
-        users[user_id] = f"Имя: {username}, возраст: {age}"
-        return f"User {user_id} has been updated"
-    else:
-        return "User not found"
+    if user_id not in users:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if age < 0:
+        raise HTTPException(status_code=400, detail="Возраст не может быть отрицательным")
 
-# DELETE запрос по маршруту '/user/{user_id}'
-@app.delete("/user/{user_id}")
+    users[user_id] = f"Имя: {username}, возраст: {age}"
+    return f"User {user_id} has been updated"
+
+
+@app.delete('/user/{user_id}')
 async def delete_user(user_id: str):
-    """Удаляет из словаря users по ключу user_id."""
-    if user_id in users:
-        del users[user_id]
-        return f"User {user_id} has been deleted"
-    else:
-        return "User not found"
+    if user_id not in users:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
 
+    del users[user_id]
+    return f"User {user_id} has been deleted"
+
+
+if __name__ == '__main__':
+    import uvicorn
+
+    uvicorn.run(app, host='127.0.0.1', port=8000)
+
+# Запуск приложения
+# uvicorn module_16_3:app --reload
